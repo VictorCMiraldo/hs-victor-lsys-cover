@@ -23,5 +23,6 @@ executable lsys
                      , lucid-svg
                      , mtl
                      , random
+                     , text
   -- hs-source-dirs:      
   default-language:    Haskell2010
