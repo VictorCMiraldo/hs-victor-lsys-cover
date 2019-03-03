@@ -12,10 +12,6 @@ import System.Random
 import Lucid.Svg
 
 import Data.Text (pack)
-
-
-import Debug.Trace
-
 import Data.List (foldl')
 
 -- |Defines the finite trace of a coalgebra up to n iterations
@@ -26,8 +22,6 @@ traceN n c seed = concat <$> (traceN (n-1) c seed >>= mapM c)
 
 data NDFPP = F | T Bool | Push | Pop | X 
   deriving (Eq , Show)
-
-           
 
 -- |Stochastic seaweed L-system
 --
@@ -79,12 +73,15 @@ type Dir = Point
 a :: Float
 a = pi / 8
 
+step :: Float
+step = 30
+
 render :: Float -> Point -> Seaweed -> [Path]
 render angle p Tip = [[p]]
 render angle p (Up swd)
   -- complex rotation. Watch out, angles are in radians
-  = let p' = p + (0 :+ 30) * cis angle
-     in onHead ([p] ++) $ render angle p' swd
+  = let p' = p + (0 :+ step) * cis angle
+     in map ([p] ++) $ render angle p' swd
 render angle p (TL swd) = render (angle + a) p swd
 render angle p (TR swd) = render (angle - a) p swd
 render angle p (Branch l r)
@@ -96,23 +93,35 @@ type Path  = [Point]
 render0 :: Seaweed -> [Path]
 render0 = render (pi/2) (0 :+ 0)
 
-path2svg :: Path -> Svg ()
-path2svg ps = do
-  polyline_ [points_ (pack $ concatMap toStr ps)
+path2svg :: (Point -> Point) -> Path -> Svg ()
+path2svg tr ps = do
+  polyline_ [points_ (pack $ concatMap (toStr . tr) ps)
             , fill_ "none"
             , stroke_ "black"
+            , stroke_width_ (pack $ show $ strokew $ fromIntegral (length ps))
             ]
   where
     toStr (x :+ y) = show x ++ " " ++ show y
 
-seaweed2svg :: Seaweed -> Svg ()
-seaweed2svg = mapM_ path2svg . render0
+    strokew n = let minstr = 0.02
+                    maxstr = 2
+                    delta   = 60
+                 in (maxstr - minstr) / delta * n
+
+seaweed2svg :: (Point -> Point) -> Seaweed -> Svg ()
+seaweed2svg tr = mapM_ (path2svg tr) . render0
+
+genSvg :: Int -> Int -> Svg ()
+genSvg seed n = do
+  seaweed2svg (mkTr $ fromIntegral n) . fst . toSeaweed . stochweedDet seed $ n
+ where
+   mkTr n (x :+ y) = (x :+ (100 * n * n + y))
 
 main :: IO ()
-main = let tree = stochweedDet 123513 3
-           (swd , _) = toSeaweed tree
-        in do
-          writeFile "res.svg" (show $ svg $ seaweed2svg swd)
+main = do
+  writeFile "res.svg" $ show $ svg $
+    do let seed = 42
+       mapM_ (\i -> g_ $ genSvg ((seed ^ i) `mod` 63557) i) [1..5]
 
 svg :: Svg () -> Svg ()
 svg content = do
