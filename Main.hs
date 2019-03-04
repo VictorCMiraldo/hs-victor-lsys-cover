@@ -37,10 +37,26 @@ stochweed X = run <$> state random
             ,T b , F , Push , T b , F , X , Pop , T (not b) , X]
 stochweed x = return [x]
 
+ss :: (RandomGen g) => Int -> State g Seaweed
+ss 0 = return Tip
+ss n = run <$> state random <*> ss (n-1) <*> ss (n-1) <*> ss (n-1) <*> ss (n-1)
+  where
+    up 0 s = s
+    up n s = Up (up (n-1) s)
+
+    run t s1 s2 s3 s4
+      = let t1 = if t then TL else TR
+            t2 = if t then TR else TL
+         in up n $ t2 $ Branch (Branch s1 (t1 s2)) $ t1 $ up n $ Branch (t1 $ up n $ s3) (t2 $ s4)
+
 type Seed = Int
 
 stochweedDet :: Seed -> Int -> [NDFPP]
 stochweedDet seed n = evalState (traceN n stochweed X) (mkStdGen seed)
+
+
+ssDet :: Seed -> Int -> Seaweed
+ssDet seed n = evalState (ss n) (mkStdGen seed)
 
 -- * Translates to a better datatype
 
